@@ -1,0 +1,392 @@
+past rd_addexp();
+past rd_eqexp();
+past rd_landexp();
+past rd_lorexp();
+past rd_mulexp();
+past rd_primaryexp();
+past rd_lval();
+past rd_exp();
+past rd_unary();
+
+past rd_addexp();
+past rd_eqexp();
+past rd_landexp();
+past rd_lorexp();
+past rd_mulexp();
+past rd_primaryexp();
+past rd_lval();
+past rd_exp();
+past rd_unary();
+past newExpr(int oper, past left, past right);
+
+
+past newExpr(int oper, past left, past right){
+  past res = newAstNode();
+  res->left = left;
+  res->right = right;
+  res->ivalue = oper;
+  return res;
+}
+
+//75 CallParams: Exp
+//76           | Exp Y_COMMA CallParams
+past rd_call_paras() {
+  //printf("rd_call_paras\n");
+  past res = rd_exp();
+  if(res == NULL){return NULL;}
+   int oper = cur_token.token;
+  while(oper==Y_COMMA){
+    advance();
+    res->next = rd_call_paras();
+    oper = cur_token.token;
+   }
+   return res;
+    
+}
+/*
+   84 RelExp: AddExp
+   85       | AddExp Y_LESS RelExp
+   86       | AddExp Y_GREAT RelExp
+   87       | AddExp Y_LESSEQ RelExp
+   88       | AddExp Y_GREATEQ RelExp
+*/
+past rd_relexp(){
+	// 代码实现
+    //printf("rd_relexp\n");
+    past l = rd_addexp();
+     if(l ==NULL) {return NULL;}
+    int oper = cur_token.token;
+   while(oper == Y_LESS || oper==Y_GREAT || oper == Y_LESSEQ || oper == Y_GREATEQ){
+      advance();
+      past r = rd_addexp();
+      l = newExpr(oper,l,r);
+      oper = cur_token.token;
+      }
+      return l;
+}
+/*
+   81 AddExp: MulExp
+   82       | AddExp Y_ADD MulExp
+   83       | AddExp Y_SUB MulExp
+
+*/
+past rd_addexp(){
+     //printf("rd_addexp\n");
+     past l =rd_mulexp();
+     if(l==NULL){return NULL;}
+     int oper = cur_token.token;
+     while(oper==Y_ADD||oper==Y_SUB){
+      advance();
+      past r = rd_mulexp();
+      l = newExpr(oper,l,r);
+      l->nodeType = BINARY_OPERATOR;
+      oper = cur_token.token;
+     }
+     return l;
+    
+}
+/*
+   89 EqExp: RelExp
+   90      | RelExp Y_EQ EqExp
+   91      | RelExp Y_NOTEQ EqExp
+
+*/
+past rd_eqexp(){
+    //printf("rd_eqexp\n");
+    past res = newAstNode();
+    past l = NULL;
+     l = rd_relexp();
+    if(l == NULL){return NULL;}
+    int cur = get_cur_tok_index();
+    int oper = cur_token.token;
+    advance();
+    if(oper==Y_EQ){
+      past r = rd_eqexp();
+      res->svalue = "=";
+      res->left = l;
+      res->right = r;
+      res->nodeType = BINARY_OPERATOR;
+    }else if(oper==Y_NOTEQ){
+      past r = rd_eqexp();
+      res->svalue = "!=";
+      res->left = l;
+      res->right = r;
+      res->nodeType = BINARY_OPERATOR;
+    }else{
+       set_cur_tok_index(cur);
+       res = l ;
+    }
+    return res;
+}
+/*
+   92 LAndExp: EqExp
+   93        | EqExp Y_AND LAndExp
+*/
+past rd_landexp(){
+    //printf("rd_landexp\n");
+    past res = newAstNode();
+    past l =NULL;
+    l = rd_eqexp();
+    if (l==NULL){return NULL;}
+    l->nodeType = BINARY_OPERATOR;
+    int cur = get_cur_tok_index();
+    int oper = cur_token.token;
+    advance();
+    if(oper==Y_AND){
+      past r = rd_landexp();
+      res->svalue = "&&";
+      res->left = l;
+      res->right = r;
+      res->nodeType = BINARY_OPERATOR;
+    }else{
+    set_cur_tok_index(cur);
+    res = l ;
+    }
+    return res;
+}
+/*
+   94 LOrExp: LAndExp
+   95       | LAndExp Y_OR LOrExp
+
+*/
+past rd_lorexp(){
+    //printf("rd_lorexp\n");
+    past res = newAstNode();
+    past l = NULL;
+    l = rd_landexp();
+    if(l==NULL){return NULL;}
+    l->nodeType = BINARY_OPERATOR;
+    int oper = cur_token.token;
+    if(oper==Y_OR){
+    advance();
+    past r = rd_lorexp();
+    res->ivalue=Y_OR;
+    res->left = l;
+    res->right = r;
+    res->nodeType = BINARY_OPERATOR;
+    }else{
+    res = l;
+    }
+    return res;
+}
+/*
+   77 MulExp: UnaryExp
+   78       | MulExp Y_MUL UnaryExp
+   79       | MulExp Y_DIV UnaryExp
+   80       | MulExp Y_MODULO UnaryExp
+
+*/
+past rd_mulexp(){
+    //printf("rd_mulexp\n");
+    past res = newAstNode();
+    past l = rd_unary();
+    if(l==NULL)
+    { return NULL;}
+    int oper = cur_token.token;
+    if(oper==Y_MUL||oper==Y_DIV||oper==Y_MODULO){
+        advance();
+        past r = rd_unary();
+        res->ivalue = oper;
+        res->left = l;
+        res->right = r;
+        res->nodeType = BINARY_OPERATOR;
+        return res;
+    }else{ return l;}
+
+}
+/*
+   65 PrimaryExp: Y_LPAR Exp Y_RPAR
+   66           | LVal
+   67           | num_INT
+   68           | num_FLOAT
+*/
+past rd_primaryexp(){
+    //printf("rd_primaryexp\n");
+    past res = NULL;
+    int oper = cur_token.token;
+    if(oper==Y_LPAR){
+      advance();
+      res = rd_exp();
+      advance();
+    }else if(oper == num_INT){
+       res = newAstNode();
+       res->ivalue = cur_token.attr.ivalue;
+       res->nodeType = INTEGER_LITERAL;
+       advance();
+    }else if(oper == num_FLOAT){
+       res = newAstNode();
+       res->fvalue = cur_token.attr.fvalue;
+       res->nodeType = FLOATING_LITERAL;
+       advance();
+    }else{
+       res = rd_lval();
+    }
+    return res;
+}
+/*
+   61 LVal: Y_ID
+   62     | Y_ID ArraySubscripts
+*/
+past rd_lval(){
+    //printf("rd_lval\n");
+    past res = newAstNode();
+    int oper = cur_token.token;
+    if(oper!=Y_ID){return NULL;}
+    res = newID(cur_token.attr.svalue);
+    res->nodeType = DECL_REF_EXPR;
+    advance();
+    int cur = get_cur_tok_index();
+    past n = rd_array_subscripts();
+        if(n!=NULL){
+        res->next = n;
+    }else{set_cur_tok_index(cur);}
+    return res;
+}
+
+past rd_exp(){
+ //printf("rd_exp\n");
+past res =  rd_addexp();
+if(res->right!=NULL){
+  res->nodeType = BINARY_OPERATOR;
+}else{res->nodeType = DECL_REF_EXPR;}
+return res;
+}
+/*
+   69 UnaryExp: PrimaryExp
+   70         | Y_ID Y_LPAR Y_RPAR
+   71         | Y_ID Y_LPAR CallParams Y_RPAR
+   72         | Y_ADD UnaryExp
+   73         | Y_SUB UnaryExp
+   74         | Y_NOT UnaryExp
+*/
+past rd_unary(){
+    //printf("rd_unary\n");
+    past res = newAstNode();
+    int oper = cur_token.token;
+    int cur = get_cur_tok_index();
+    past l = rd_primaryexp();
+    if(l!=NULL){
+      return l;
+    }else{
+      set_cur_tok_index(cur);
+    }
+    if(oper==Y_ID){
+        char* IDinfo = cur_token.attr.svalue;
+        advance();
+        advance();
+        int oper2 = cur_token.token;
+        if(oper2==Y_RPAR){
+        res = newID(IDinfo);
+        advance();
+        }else{
+        res = newID(IDinfo);
+        past n = rd_call_paras();
+        res->next = n;
+        advance();
+        }
+    }else if(oper==Y_AND||oper==Y_SUB||oper==Y_NOT){
+        res = newAstNode();
+        res->ivalue=oper;
+        advance();
+        past r = rd_unary();
+        res->right = r;
+    }else{return NULL;}
+    return res;
+}
+/*
+   49 Stmt: LVal Y_ASSIGN Exp Y_SEMICOLON
+   50     | Y_SEMICOLON
+   51     | Exp Y_SEMICOLON
+   52     | Block
+   53     | Y_WHILE Y_LPAR LOrExp Y_RPAR Stmt
+   54     | Y_IF Y_LPAR LOrExp Y_RPAR Stmt
+   55     | Y_IF Y_LPAR LOrExp Y_RPAR Stmt Y_ELSE Stmt
+   56     | Y_BREAK Y_SEMICOLON
+   57     | Y_CONTINUE Y_SEMICOLON
+   58     | Y_RETURN Exp Y_SEMICOLON
+   59     | Y_RETURN Y_SEMICOLON
+*/
+past rd_stmt(){
+  //printf("rd_stmt\n");
+  past res = newAstNode();
+  int cur = get_cur_tok_index();
+  int oper = cur_token.token;
+  if(oper==Y_SEMICOLON){
+    res->ivalue = Y_SEMICOLON;
+    advance();
+  }else if (oper==Y_WHILE){
+    advance();
+    advance();
+    past con = rd_lorexp();
+    advance();
+    past st = rd_stmt();
+    res->left = con;
+    res->right= st;
+    res->nodeType = WHILE_STMT;
+    //res->right->ivalue = '=';
+  }else if(oper==Y_IF){
+    advance();
+    advance();
+    past con = rd_lorexp();
+    //con->ivalue = Y_LESS;
+    con->nodeType = BINARY_OPERATOR;
+    advance();
+    past st1 = rd_stmt();
+    st1->ivalue = Y_ASSIGN;
+    if(cur_token.token==Y_ELSE){
+      advance();
+      past st2 = rd_stmt();
+      res->nodeType = IF_STMT;
+      res->if_cond = con;
+      res->left = st1;
+      //con->left->nodeType = BINARY_OPERATOR;
+      res->right = st2;
+    }else{
+      res->nodeType = IF_STMT;
+      res->if_cond = con;
+      res->left= st1;
+    }
+  }else if(oper==Y_BREAK){
+    res->nodeType = BREAK_STMT;
+    advance();
+    advance();
+  }else if(oper==Y_CONTINUE){
+    res->nodeType = CONTINUE_STMT;
+    advance();
+    advance();
+  }else if(oper==Y_RETURN){
+    advance();
+    if(cur_token.token==Y_SEMICOLON){
+      res->nodeType = RETURN_STMT;
+      advance();
+    }else{
+      past n = rd_exp();
+      res->nodeType = RETURN_STMT;     
+      res->next = n;
+      advance();
+    }
+  }else {
+    past l = rd_lval();
+    if(l!=NULL){
+      advance();
+      past r = rd_exp();
+      advance();
+      res->nodeType = BINARY_OPERATOR;
+      res->left = l;
+      res->right = r;
+      res->ivalue ='=';
+    }else{
+        set_cur_tok_index(cur);
+        past l =rd_block();
+        if(l!=NULL){
+          res = l;
+        }else{
+          set_cur_tok_index(cur);
+          res = rd_exp();
+          advance();
+        }
+    }
+  }
+  return res;
+  
+}
